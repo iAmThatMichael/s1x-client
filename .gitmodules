@@ -1,0 +1,31 @@
+[submodule "deps/asmjit"]
+	path = deps/asmjit
+	url = https://github.com/asmjit/asmjit
+[submodule "deps/GSL"]
+	path = deps/GSL
+	url = https://github.com/Microsoft/GSL
+[submodule "deps/discord-rpc"]
+	path = deps/discord-rpc
+	url = https://github.com/discord/discord-rpc
+[submodule "deps/libtomcrypt"]
+	path = deps/libtomcrypt
+	url = https://github.com/libtom/libtomcrypt
+[submodule "deps/libtommath"]
+	path = deps/libtommath
+	url = https://github.com/libtom/libtommath
+[submodule "deps/minhook"]
+	path = deps/minhook
+	url = https://github.com/TsudaKageyu/minhook
+[submodule "deps/rapidjson"]
+	path = deps/rapidjson
+	url = https://github.com/Tencent/rapidjson
+[submodule "deps/udis86"]
+	path = deps/udis86
+	url = https://github.com/vmt/udis86
+[submodule "deps/zlib"]
+	path = deps/zlib
+	url = https://github.com/madler/zlib
+[submodule "deps/protobuf"]
+	path = deps/protobuf
+	url = https://github.com/google/protobuf.git
+	branch = 3.14.x
