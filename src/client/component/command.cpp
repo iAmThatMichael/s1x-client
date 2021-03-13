@@ -229,10 +229,10 @@ namespace command
 	void enum_assets(const game::XAssetType type, const std::function<void(game::XAssetHeader)>& callback, const bool includeOverride)
 	{
 		game::DB_EnumXAssets_Internal(type, static_cast<void(*)(game::XAssetHeader, void*)>([](game::XAssetHeader header, void* data)
-			{
-				const auto& cb = *static_cast<const std::function<void(game::XAssetHeader)>*>(data);
-				cb(header);
-			}), &callback, includeOverride);
+		{
+			const auto& cb = *static_cast<const std::function<void(game::XAssetHeader)>*>(data);
+			cb(header);
+		}), &callback, includeOverride);
 	}
 
 	class component final : public component_interface
@@ -353,11 +353,21 @@ namespace command
 
 					enum_assets(type, [type](game::XAssetHeader header)
 					{
-						const auto asset = game::XAsset{ type, header };
-						const auto* const asset_name = game::DB_GetXAssetName(&asset);
-						//const auto entry = game::DB_FindXAssetEntry(type, asset_name);
-						//TODO: display which zone the asset is from
-						game_console::print(game_console::con_type_info, "%s", asset_name);
+						const game::XAsset asset{ type, header };
+						const auto* asset_name = game::DB_GetXAssetName(&asset);
+						const auto* const entry = game::DB_FindXAssetEntry(type, asset_name);
+						const char* zone_name;
+
+						if(game::environment::is_sp())
+						{
+							zone_name = game::sp::g_zones_0[entry->zoneIndex].name;
+						}
+						else
+						{
+							zone_name = game::mp::g_zones_0[entry->zoneIndex].name;
+						}
+
+						game_console::print(game_console::con_type_info, "%s | %s.ff", asset_name, zone_name);
 					}, true);
 				}
 			});
