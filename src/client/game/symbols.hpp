@@ -42,9 +42,9 @@ namespace game
 	WEAK symbol<void(XAssetType type, void (__cdecl* func)(XAssetHeader, void*), void* inData, bool includeOverride)>
 	DB_EnumXAssets_FastFile{0x14017D7C0, 0x14026EC10};
 	WEAK symbol<void(XAssetType type, void(__cdecl* func)(game::XAssetHeader, void*), const void* inData, bool includeOverride)>
-	DB_EnumXAssets_Internal{ 0x14017D830, 0x14026EC80 };
-	WEAK symbol<game::XAssetEntry(game::XAssetType type, const char* name)>
-	DB_FindXAssetEntry{ 0x14017D830, 0x14026F020 };
+	DB_EnumXAssets_Internal{0x14017D830, 0x14026EC80};
+	WEAK symbol<game::XAssetEntry*(game::XAssetType type, const char* name)>
+	DB_FindXAssetEntry{0x14017DBD0, 0x14026F020};
 	WEAK symbol<const char* (const XAsset* asset)> DB_GetXAssetName{0x140151C00, 0x140240DD0};
 	WEAK symbol<int(XAssetType type)> DB_GetXAssetTypeSize{0x140151C20, 0x140240DF0};
 	WEAK symbol<void(XZoneInfo* zoneInfo, unsigned int zoneCount, DBSyncMode syncMode)> DB_LoadXAssets{
@@ -202,10 +202,12 @@ namespace game
 	WEAK symbol<XAssetEntry> g_assetEntryPool{0x142CC2400, 0x14379F100};
 	WEAK symbol<int> g_poolSize{0x140804140, 0x1409B4B90};
 	WEAK symbol<const char*> g_assetNames{0x140803C90, 0x1409B3180};
-
+	
 	WEAK symbol<DWORD> threadIds{0x149632EC0, 0x147DCEA30};
 
 	WEAK symbol<GfxDrawMethod_s> gfxDrawMethod{0x14CDFAFE8, 0x14D80FD98};
+
+	WEAK symbol<XZoneInfoInternal> g_zoneInfo{0x1401801D0, 0x143B739F0};
 
 	namespace mp
 	{
@@ -216,10 +218,13 @@ namespace game
 		WEAK symbol<int> sv_serverId_value{0, 0x1488A9A60};
 
 		WEAK symbol<char> virtualLobby_loaded{0, 0x1417E161D};
+
+		WEAK symbol<XZone> g_zones_0{0, 0x143B50600};
 	}
 
 	namespace sp
 	{
 		WEAK symbol<gentity_s> g_entities{0x143C26DC0, 0};
+		WEAK symbol<XZone> g_zones_0{0x143073900, 0};
 	}
 }

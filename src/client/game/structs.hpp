@@ -816,14 +816,7 @@ namespace game
 		DB_LOAD_ASYNC_NO_SYNC_THREADS = 0x4,
 		DB_LOAD_SYNC_SKIP_ALWAYS_LOADED = 0x5,
 	};
-
-	struct XZoneInfo
-	{
-		const char* name;
-		int allocFlags;
-		int freeFlags;
-	};
-
+	
 	enum XAssetType
 	{
 		ASSET_TYPE_PHYSPRESET,
@@ -1068,11 +1061,25 @@ namespace game
 	struct XAssetEntry
 	{
 		XAsset asset;
-		char zoneIndex;
-		volatile char inuseMask;
+		unsigned __int16 zoneIndex;
+		volatile int inuseMask;
 		unsigned int nextHash;
 		unsigned int nextOverride;
 		unsigned int nextPoolEntry;
+	};
+
+	struct XZoneInfo
+	{
+		const char* name;
+		int allocFlags;
+		int freeFlags;
+	};
+
+	struct XZoneInfoInternal
+	{
+		char name[64];
+		int flags;
+		int isBaseMap;
 	};
 
 	enum TestClientType
@@ -1134,6 +1141,15 @@ namespace game
 			TestClientType testClient; // 269600
 			char __pad3[391700];
 		}; // size = 661304
+
+		struct XZone
+		{
+			char gap2[24];
+			char name[64];
+			XAssetEntry* entry;
+			char gap4[399];
+			char gap5;
+		};
 	}
 
 	namespace sp
@@ -1155,6 +1171,16 @@ namespace game
 		struct playerState_s
 		{
 		};
+
+		struct XZone
+		{
+			char gap2[24];
+			char name[64];
+			XAssetEntry* entry;
+			char gap4[113];
+			char gap5;
+		};
+
 	}
 
 	union playerState_s
