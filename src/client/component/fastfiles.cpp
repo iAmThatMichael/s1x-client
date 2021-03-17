@@ -63,14 +63,6 @@ namespace fastfiles
 				game::DB_LoadXAssets(&info, 1u, game::DBSyncMode::DB_LOAD_SYNC);
 			});
 
-			command::add("g_poolSizes", []()
-			{
-				for (auto i = 0; i < game::ASSET_TYPE_COUNT; i++)
-				{
-					printf("g_poolSize[%i]: %i // %s\n", i, game::g_poolSize[i], game::g_assetNames[i]);
-				}
-			});
-
 			reallocate_asset_pool(game::ASSET_TYPE_FONT, 48);
 		}
 	};

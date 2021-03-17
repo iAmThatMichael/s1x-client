@@ -329,11 +329,11 @@ namespace command
 				if (params.size() < 2)
 				{
 					game_console::print(game_console::con_type_info,
-									"listassetpool <poolnumber>: list all the assets in the specified pool\n");
+									"listassetpool <poolnumber> [filter]: list all the assets in the specified pool\n");
 
 					for (auto i = 0; i < game::XAssetType::ASSET_TYPE_COUNT; i++)
 					{
-						game_console::print(game_console::con_type_info, "%d %s\n", i, game::g_assetNames[i]);
+						game_console::print(game_console::con_type_info, "%d %s %d\n", i, game::g_assetNames[i], game::g_poolSize[i]);
 					}
 				}
 				else
@@ -351,12 +351,21 @@ namespace command
 					game_console::print(game_console::con_type_info, "Listing assets in pool %s",
 										game::g_assetNames[type]);
 
-					enum_assets(type, [type](game::XAssetHeader header)
+					auto total_assets = 0;
+					const std::string filter = params.get(2);
+					enum_assets(type, [type, &total_assets, filter](const game::XAssetHeader header)
 					{
 						const game::XAsset asset{ type, header };
-						const auto* asset_name = game::DB_GetXAssetName(&asset);
+						auto* const asset_name = game::DB_GetXAssetName(&asset);
 						const auto* const entry = game::DB_FindXAssetEntry(type, asset_name);
 						const char* zone_name;
+
+						total_assets++;
+
+						if (!filter.empty() && !game_console::match_compare(filter, asset_name, false))
+						{
+							return;
+						}
 
 						if(game::environment::is_sp())
 						{
@@ -369,6 +378,8 @@ namespace command
 
 						game_console::print(game_console::con_type_info, "%s | %s.ff", asset_name, zone_name);
 					}, true);
+
+					game_console::print(game_console::con_type_info, "Total %s assets: %d/%d", game::g_assetNames[type], total_assets, game::g_poolSize[type]);
 				}
 			});
 		}
