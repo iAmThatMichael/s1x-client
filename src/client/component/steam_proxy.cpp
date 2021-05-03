@@ -17,7 +17,7 @@ namespace steam_proxy
 {
 	namespace
 	{
-		utils::binary_resource runner_file(RUNNER, "runner.exe");
+		utils::binary_resource runner_file(RUNNER, "s1x-runner.exe");
 
 		bool is_disabled()
 		{
@@ -40,14 +40,14 @@ namespace steam_proxy
 			this->clean_up_on_error();
 
 #ifndef DEV_BUILD
-	try
-	{
-		this->start_mod("\xF0\x9F\x90\xA4" " S1x: "s + game::environment::get_string(), game::environment::is_sp() ? 209650 : 209660);
-	}
-	catch (std::exception& e)
-	{
-		printf("Steam: %s\n", e.what());
-	}
+			try
+			{
+				this->start_mod("\xF0\x9F\x94\xB1" " S1x: "s + game::environment::get_string(), game::environment::is_sp() ? 209650 : 209660);
+			}
+			catch (std::exception& e)
+			{
+				printf("Steam: %s\n", e.what());
+			}
 #endif
 		}
 
@@ -121,7 +121,19 @@ namespace steam_proxy
 			this->client_utils_ = this->client_engine_.invoke<void*>(14, this->steam_pipe_); // GetIClientUtils
 		}
 
-		void start_mod(const std::string& title, size_t app_id)
+		void start_mod(const std::string& title, const size_t app_id)
+		{
+			__try
+			{
+				this->start_mod_unsafe(title, app_id);
+			}
+			__except (EXCEPTION_EXECUTE_HANDLER)
+			{
+				this->do_cleanup();
+			}
+		}
+
+		void start_mod_unsafe(const std::string& title, size_t app_id)
 		{
 			if (!this->client_utils_ || !this->client_user_) return;
 
@@ -149,6 +161,18 @@ namespace steam_proxy
 			                                &game_id.bits, title.data(), 0, 0, 0);
 		}
 
+		void do_cleanup()
+		{
+			this->client_engine_ = nullptr;
+			this->client_user_ = nullptr;
+			this->client_utils_ = nullptr;
+
+			this->steam_pipe_ = nullptr;
+			this->global_user_ = nullptr;
+
+			this->steam_client_module_ = utils::nt::library{nullptr};
+		}
+
 		void clean_up_on_error()
 		{
 			scheduler::schedule([this]()
@@ -164,15 +188,7 @@ namespace steam_proxy
 					return scheduler::cond_continue;
 				}
 
-				this->client_engine_ = nullptr;
-				this->client_user_ = nullptr;
-				this->client_utils_ = nullptr;
-
-				this->steam_pipe_ = nullptr;
-				this->global_user_ = nullptr;
-
-				this->steam_client_module_ = utils::nt::library{nullptr};
-
+				this->do_cleanup();
 				return scheduler::cond_end;
 			});
 		}

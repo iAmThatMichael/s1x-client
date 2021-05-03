@@ -140,7 +140,7 @@ namespace fps
 		void cg_draw_fps_register_stub(const char* name, const char** _enum, const int value, unsigned int /*flags*/,
 		                               const char* desc)
 		{
-			game::Dvar_RegisterEnum(name, _enum, value, 0x1, desc);
+			game::Dvar_RegisterEnum(name, _enum, value, game::DVAR_FLAG_SAVED, desc);
 		}
 	}
 
@@ -161,10 +161,13 @@ namespace fps
 			// change cg_drawfps flags to saved
 			utils::hook::call(SELECT_VALUE(0x1400EF951, 0x1401A4B8E), &cg_draw_fps_register_stub);
 
+			// fix ping value
+			utils::hook::nop(0x140213031, 2);
+
 			scheduler::loop(cg_draw_fps, scheduler::pipeline::renderer);
 			if (game::environment::is_mp())
 			{
-				game::Dvar_RegisterInt("cg_drawPing", 0, 0, 1, 0, "Choose to draw ping");
+				game::Dvar_RegisterInt("cg_drawPing", 0, 0, 1, game::DVAR_FLAG_SAVED, "Choose to draw ping");
 				scheduler::loop(cg_draw_ping, scheduler::pipeline::renderer);
 			}
 		}

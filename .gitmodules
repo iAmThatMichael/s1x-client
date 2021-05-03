@@ -10,7 +10,7 @@
 [submodule "deps/protobuf"]
 	path = deps/protobuf
 	url = https://github.com/google/protobuf.git
-	branch = 3.14.x
+	branch = 3.15.x
 [submodule "deps/minhook"]
 	path = deps/minhook
 	url = https://github.com/TsudaKageyu/minhook.git
@@ -31,8 +31,13 @@
 	url = https://github.com/discord/discord-rpc.git
 [submodule "deps/asmjit"]
 	path = deps/asmjit
-	url = https://github.com/Joelrau/asmjit.git
-	branch = old-state
+	url = https://github.com/asmjit/asmjit.git
 [submodule "deps/WinToast"]
 	path = deps/WinToast
 	url = https://github.com/mohabouje/WinToast.git
+[submodule "deps/sol2"]
+	path = deps/sol2
+	url = https://github.com/ThePhD/sol2.git
+[submodule "deps/lua"]
+	path = deps/lua
+	url = https://github.com/lua/lua.git

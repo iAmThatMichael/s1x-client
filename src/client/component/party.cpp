@@ -1,8 +1,7 @@
 #include <std_include.hpp>
 #include "loader/component_loader.hpp"
 #include "party.hpp"
-
-#include "dvars.hpp"
+#include "console.hpp"
 #include "command.hpp"
 #include "network.hpp"
 #include "scheduler.hpp"
@@ -23,6 +22,7 @@ namespace party
 		{
 			game::netadr_s host{};
 			std::string challenge{};
+			bool hostDefined{false};
 		} connect_state;
 
 		std::string sv_motd;
@@ -121,6 +121,29 @@ namespace party
 			reinterpret_cast<void(*)(const char*, const char*)>(0x1404C39B0)(dvar_name, string);
 			party::sv_motd.clear();
 		}
+
+		void disconnect_stub()
+		{
+			if (!game::VirtualLobby_Loaded())
+			{
+				if (game::CL_IsCgameInitialized())
+				{
+					// CL_ForwardCommandToServer
+					reinterpret_cast<void (*)(int, const char*)>(0x14020B310)(0, "disconnect");
+					// CL_WritePacket
+					reinterpret_cast<void (*)(int)>(0x1402058F0)(0);
+				}
+				// CL_Disconnect
+				reinterpret_cast<void (*)(int)>(0x140209EC0)(0);
+			}
+		}
+
+		const auto drop_reason_stub = utils::hook::assemble([](utils::hook::assembler& a)
+		{
+			a.mov(rdx, rdi);
+			a.mov(ecx, 2);
+			a.jmp(0x140209DD9);
+		});
 	}
 
 	int get_client_num_by_name(const std::string& name)
@@ -187,6 +210,7 @@ namespace party
 
 		connect_state.host = target;
 		connect_state.challenge = utils::cryptography::random::get_challenge();
+		connect_state.hostDefined = true;
 
 		network::send(target, "getInfo", connect_state.challenge);
 	}
@@ -204,31 +228,31 @@ namespace party
 		{
 			if (!game::SV_MapExists(mapname.data()))
 			{
-				printf("Map '%s' doesn't exist.\n", mapname.data());
+				console::info("Map '%s' doesn't exist.\n", mapname.data());
 				return;
-			}
-
-			if (!game::environment::is_dedi())
-			{
-				if(game::SV_Loaded())
-				{
-					const auto* args = "Leave";
-					game::UI_RunMenuScript(0, &args);
-				}
-				
-				perform_game_initialization();
 			}
 
 			auto* current_mapname = game::Dvar_FindVar("mapname");
 			if (current_mapname && utils::string::to_lower(current_mapname->current.string) ==
 				utils::string::to_lower(mapname) && (game::SV_Loaded() && !game::VirtualLobby_Loaded()))
 			{
-				printf("Restarting map: %s\n", mapname.data());
+				console::info("Restarting map: %s\n", mapname.data());
 				command::execute("map_restart", false);
 				return;
 			}
 
-			printf("Starting map: %s\n", mapname.data());
+			if (!game::environment::is_dedi())
+			{
+				if (game::SV_Loaded())
+				{
+					const auto* args = "Leave";
+					game::UI_RunMenuScript(0, &args);
+				}
+
+				perform_game_initialization();
+			}
+
+			console::info("Starting map: %s\n", mapname.data());
 
 			auto* gametype = game::Dvar_FindVar("g_gametype");
 			if (gametype && gametype->current.string)
@@ -249,29 +273,6 @@ namespace party
 		}
 	}
 
-	void send_disconnect()
-	{
-		if (game::CL_IsCgameInitialized() && !game::VirtualLobby_Loaded())
-		{
-			// CL_ForwardCommandToServer
-			reinterpret_cast<void (*)(int, const char*)>(0x14020B310)(0, "disconnect");
-			// CL_WritePacket
-			reinterpret_cast<void (*)(int)>(0x1402058F0)(0);
-		}
-	}
-
-	const auto disconnect_stub = utils::hook::assemble([](utils::hook::assembler& a)
-	{
-		a.pushad64();
-		a.call_aligned(send_disconnect);
-		a.popad64();
-
-		a.mov(edx, 1);
-		a.xor_(ecx, ecx);
-
-		a.jmp(0x140209EC0);
-	});
-
 	class component final : public component_interface
 	{
 	public:
@@ -283,7 +284,16 @@ namespace party
 			}
 
 			// hook disconnect command function
-			utils::hook::jump(0x14020A010, disconnect_stub, true);
+			utils::hook::jump(0x14020A010, disconnect_stub);
+
+			if (game::environment::is_mp())
+			{
+				// show custom drop reason
+				utils::hook::nop(0x140209D5C, 13);
+				utils::hook::jump(0x140209D5C, drop_reason_stub, true);
+			}
+			// enable custom kick reason in GScr_KickPlayer
+			utils::hook::set<uint8_t>(0x14032ED80, 0xEB);
 
 			command::add("map", [](const command::params& argument)
 			{
@@ -315,6 +325,25 @@ namespace party
 				}
 			});
 
+			command::add("reconnect", [](const command::params& argument)
+			{
+				if (!connect_state.hostDefined)
+				{
+					console::info("Cannot connect to server.\n");
+					return;
+				}
+
+				if (game::CL_IsCgameInitialized())
+				{
+					command::execute("disconnect");
+					command::execute("reconnect");
+				}
+				else
+				{
+					connect(connect_state.host);
+				}
+			});
+
 			command::add("connect", [](const command::params& argument)
 			{
 				if (argument.size() != 2)
@@ -333,24 +362,58 @@ namespace party
 			{
 				if (params.size() < 2)
 				{
-					printf("usage: kickClient <num>\n");
+					console::info("usage: kickClient <num>, <reason>(optional)\n");
 					return;
 				}
+
+				if (!game::SV_Loaded() || game::VirtualLobby_Loaded())
+				{
+					return;
+				}
+
+				std::string reason;
+				if (params.size() > 2)
+				{
+					reason = params.join(2);
+				}
+				if (reason.empty())
+				{
+					reason = "EXE_PLAYERKICKED";
+				}
+
 				const auto client_num = atoi(params.get(1));
 				if (client_num < 0 || client_num >= *game::mp::svs_numclients)
 				{
 					return;
 				}
 
-				game::SV_KickClientNum(client_num, "EXE_PLAYERKICKED");
+				scheduler::once([client_num, reason]()
+				{
+					game::SV_KickClientNum(client_num, reason.data());
+				}, scheduler::pipeline::server);
 			});
 
 			command::add("kick", [](const command::params& params)
 			{
 				if (params.size() < 2)
 				{
-					printf("usage: kick <name>\n");
+					console::info("usage: kick <name>, <reason>(optional)\n");
 					return;
+				}
+
+				if (!game::SV_Loaded() || game::VirtualLobby_Loaded())
+				{
+					return;
+				}
+
+				std::string reason;
+				if (params.size() > 2)
+				{
+					reason = params.join(2);
+				}
+				if (reason.empty())
+				{
+					reason = "EXE_PLAYERKICKED";
 				}
 
 				const std::string name = params.get(1);
@@ -358,7 +421,10 @@ namespace party
 				{
 					for (auto i = 0; i < *game::mp::svs_numclients; ++i)
 					{
-						game::SV_KickClientNum(i, "EXE_PLAYERKICKED");
+						scheduler::once([i, reason]()
+						{
+							game::SV_KickClientNum(i, reason.data());
+						}, scheduler::pipeline::server);
 					}
 					return;
 				}
@@ -369,7 +435,10 @@ namespace party
 					return;
 				}
 
-				game::SV_KickClientNum(client_num, "EXE_PLAYERKICKED");
+				scheduler::once([client_num, reason]()
+				{
+					game::SV_KickClientNum(client_num, reason.data());
+				}, scheduler::pipeline::server);
 			});
 
 			scheduler::once([]()
@@ -457,6 +526,7 @@ namespace party
 				info.set("protocol", utils::string::va("%i", PROTOCOL));
 				info.set("playmode", utils::string::va("%i", game::Com_GetCurrentCoDPlayMode()));
 				info.set("sv_running", utils::string::va("%i", get_dvar_bool("sv_running")));
+				info.set("dedicated", utils::string::va("%i", get_dvar_bool("dedicated")));
 
 				network::send(target, "infoResponse", info.build(), '\n');
 			});

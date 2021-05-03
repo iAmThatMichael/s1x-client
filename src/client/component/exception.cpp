@@ -15,6 +15,8 @@
 
 #include <version.hpp>
 
+#include "game/dvars.hpp"
+
 namespace exception
 {
 	namespace
@@ -104,6 +106,11 @@ namespace exception
 
 		void reset_state()
 		{
+			if (dvars::cg_legacyCrashHandling && dvars::cg_legacyCrashHandling->current.enabled)
+			{
+				display_error_dialog();
+			}
+
 			// TODO: Add a limit for dedi restarts
 			if (game::environment::is_dedi())
 			{
@@ -117,7 +124,8 @@ namespace exception
 				++recovery_data.recovery_counts;
 				game::Com_Error(game::ERR_DROP, "Fatal error (0x%08X) at 0x%p.\nA minidump has been written.\n\n"
 				                "S1x has tried to recover your game, but it might not run stable anymore.\n\n"
-				                "Make sure to update your graphics card drivers and install operating system updates!",
+				                "Make sure to update your graphics card drivers and install operating system updates!\n"
+				                "Closing or restarting Steam might also help.",
 				                exception_data.code, exception_data.address);
 			}
 			else
@@ -225,6 +233,11 @@ namespace exception
 	class component final : public component_interface
 	{
 	public:
+		component()
+		{
+			SetUnhandledExceptionFilter(exception_filter);
+		}
+
 		void post_load() override
 		{
 			SetUnhandledExceptionFilter(exception_filter);
@@ -234,6 +247,13 @@ namespace exception
 			{
 				is_initialized() = true;
 			});
+		}
+
+		void post_unpack() override
+		{
+			dvars::cg_legacyCrashHandling = game::Dvar_RegisterBool("cg_legacyCrashHandling", false,
+			                                                        game::DVAR_FLAG_SAVED,
+			                                                        "Disable new crash handling");
 		}
 	};
 }

@@ -4,7 +4,7 @@
 #include "game/game.hpp"
 
 #include "command.hpp"
-#include "game_console.hpp"
+#include "console.hpp"
 
 #include <utils/hook.hpp>
 
@@ -17,11 +17,16 @@ namespace lui
 		{
 			if (!game::environment::is_mp()) return;
 
+#ifdef _DEBUG
+			// Enable development menus (causes issues in sp)
+			utils::hook::set<uint32_t>(SELECT_VALUE(0x1400B4ABC, 0x140109FAC), 1);
+#endif
+
 			command::add("lui_open", [](const command::params& params)
 			{
 				if (params.size() <= 1)
 				{
-					game_console::print(game_console::con_type_info, "usage: lui_open <name>\n");
+					console::info("usage: lui_open <name>\n");
 					return;
 				}
 
@@ -32,7 +37,7 @@ namespace lui
 			{
 				if (params.size() <= 1)
 				{
-					game_console::print(game_console::con_type_info, "usage: lui_open_popup <name>\n");
+					console::info("usage: lui_open_popup <name>\n");
 					return;
 				}
 

@@ -3,12 +3,14 @@
 
 #include <utils/io.hpp>
 #include <utils/nt.hpp>
+#include <utils/http.hpp>
 #include <utils/toast.hpp>
 #include <utils/binary_resource.hpp>
 
 #include <version.hpp>
 
-#define APPVEYOR_ARTIFACT_BASE "https://ci.appveyor.com/api/projects/XLabsProject/s1x-client/artifacts/"
+#define APPVEYOR_ARTIFACT_BASE "https://master.xlabs.dev:444"
+#define APPVEYOR_PROJECT "s1x"
 #define APPVEYOR_BRANCH GIT_BRANCH
 
 #ifdef DEBUG
@@ -17,12 +19,9 @@
 #define APPVEYOR_CONFIGURATION "Release"
 #endif
 
-#define APPVEYOR_JOB "Environment%3A%20APPVEYOR_BUILD_WORKER_IMAGE%3DVisual%20Studio%202019%2C%20PREMAKE_ACTION%3Dvs2019%2C%20CI%3D1%3B%20Configuration%3A%20" APPVEYOR_CONFIGURATION
-#define APPVEYOR_ARTIFACT_SUFFIX "?branch=" APPVEYOR_BRANCH "&job=" APPVEYOR_JOB
+#define APPVEYOR_ARTIFACT_URL(artifact) (APPVEYOR_ARTIFACT_BASE "/" APPVEYOR_PROJECT "/" APPVEYOR_BRANCH "/" APPVEYOR_CONFIGURATION "/" artifact)
 
-#define APPVEYOR_ARTIFACT_URL(artifact) (APPVEYOR_ARTIFACT_BASE artifact APPVEYOR_ARTIFACT_SUFFIX)
-
-#define APPVEYOR_S1X_EXE    APPVEYOR_ARTIFACT_URL("build/bin/x64/" APPVEYOR_CONFIGURATION "/s1x.exe")
+#define APPVEYOR_S1X_EXE    APPVEYOR_ARTIFACT_URL("build/bin/x64/" APPVEYOR_CONFIGURATION "/" APPVEYOR_PROJECT ".exe")
 #define APPVEYOR_VERSION_TXT APPVEYOR_ARTIFACT_URL("build/version.txt")
 
 namespace updater
@@ -31,50 +30,16 @@ namespace updater
 	{
 		utils::binary_resource s1x_icon(ICON_IMAGE, "s1x-icon.png");
 
-		std::string download_file_sync(const std::string& url)
-		{
-			CComPtr<IStream> stream;
-
-			if (FAILED(URLOpenBlockingStreamA(nullptr, url.data(), &stream, 0, nullptr)))
-			{
-				return {};
-			}
-
-			char buffer[0x1000];
-			std::string result;
-
-			HRESULT status{};
-
-			do
-			{
-				DWORD bytes_read = 0;
-				status = stream->Read(buffer, sizeof(buffer), &bytes_read);
-
-				if (bytes_read > 0)
-				{
-					result.append(buffer, bytes_read);
-				}
-			}
-			while (SUCCEEDED(status) && status != S_FALSE);
-
-			if (FAILED(status))
-			{
-				return {};
-			}
-
-			return result;
-		}
-
 		bool is_update_available()
 		{
-			const auto version = download_file_sync(APPVEYOR_VERSION_TXT);
-			return !version.empty() && version != GIT_HASH;
+			const auto version = utils::http::get_data(APPVEYOR_VERSION_TXT);
+			return version && !version->empty() && version != GIT_HASH;
 		}
 
 		void perform_update(const std::string& target)
 		{
-			const auto binary = download_file_sync(APPVEYOR_S1X_EXE);
-			utils::io::write_file(target, binary);
+			const auto binary = utils::http::get_data(APPVEYOR_S1X_EXE);
+			utils::io::write_file(target, *binary);
 		}
 
 		void delete_old_file(const std::string& file)

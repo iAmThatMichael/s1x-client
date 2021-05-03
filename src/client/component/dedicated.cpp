@@ -29,6 +29,12 @@ namespace dedicated
 
 		void send_heartbeat()
 		{
+			auto* const dvar = game::Dvar_FindVar("sv_lanOnly");
+			if (dvar && dvar->current.enabled)
+			{
+				return;
+			}
+
 			game::netadr_s target{};
 			if (server_list::get_master_server(target))
 			{
@@ -126,6 +132,25 @@ namespace dedicated
 
 			com_quit_f_hook.invoke<void>();
 		}
+
+		void sys_error_stub(const char* msg, ...)
+		{
+			char buffer[2048];
+
+			va_list ap;
+			va_start(ap, msg);
+
+			vsnprintf_s(buffer, sizeof(buffer), _TRUNCATE, msg, ap);
+
+			va_end(ap);
+
+			scheduler::once([]()
+			{
+				command::execute("map_rotate");
+			}, scheduler::main, 3s);
+
+			game::Com_Error(game::ERR_DROP, "%s", buffer);
+		}
 	}
 
 	void initialize()
@@ -150,6 +175,12 @@ namespace dedicated
 				return;
 			}
 
+			// Register dedicated dvar
+			game::Dvar_RegisterBool("dedicated", true, game::DVAR_FLAG_READ, "Dedicated server");
+
+			// Add lanonly mode
+			game::Dvar_RegisterBool("sv_lanOnly", false, game::DVAR_FLAG_NONE, "Don't send heartbeat");
+
 			// Disable VirtualLobby
 			dvars::override::Dvar_RegisterBool("virtualLobbyEnabled", false, game::DVAR_FLAG_NONE | game::DVAR_FLAG_READ);
 
@@ -158,6 +189,9 @@ namespace dedicated
 
 			// Don't allow sv_hostname to be changed by the game
 			dvars::disable::Dvar_SetString("sv_hostname");
+
+			// Stop crashing from sys_errors
+			utils::hook::jump(0x1404D6260, sys_error_stub);
 
 			// Hook R_SyncGpu
 			utils::hook::jump(0x1405A7630, sync_gpu_stub);
@@ -243,6 +277,10 @@ namespace dedicated
 			utils::hook::nop(0x1404CC471, 2); // ^
 			utils::hook::set<uint8_t>(0x140279B80, 0xC3); // Disable image pak file loading
 
+			// Reduce min required memory
+			utils::hook::set<uint64_t>(0x1404D140D, 0x80000000);
+			utils::hook::set<uint64_t>(0x1404D14BF, 0x80000000);
+
 			// initialize the game after onlinedataflags is 32 (workaround)
 			scheduler::schedule([=]()
 			{
@@ -275,7 +313,7 @@ namespace dedicated
 
 				// Send heartbeat to dpmaster
 				scheduler::once(send_heartbeat, scheduler::pipeline::server);
-				scheduler::loop(send_heartbeat, scheduler::pipeline::server, 2min);
+				scheduler::loop(send_heartbeat, scheduler::pipeline::server, 10min);
 				command::add("heartbeat", send_heartbeat);
 			}, scheduler::pipeline::main, 1s);
 
